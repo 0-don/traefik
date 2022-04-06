@@ -58,7 +58,7 @@ services:
     - 'traefik.http.routers.librespeed.tls.certresolver=letsencrypt'
 
 networks:
-  specific-network-name:
+  proxy:
     external: false
-    name: specific-network-name
+    name: proxy
 ```
