@@ -1,18 +1,54 @@
 <p align="center">
   <a href="https://github.com/Don-Cryptus/traefik">
-    <img src="assets/traefik.png" alt="Logo" width=400 />
+    <img src="img/traefik.png" alt="Logo" width=400 />
   </a>
 
   <p align="center">
-    <br />
-    Traefik & Docker with Cloudflare + Letsencrypt
-    <br />
-    <a href="https://github.com/Don-Cryptus/clippy/issues">Report Bug</a>
+    <h1 align="center">Traefik & Docker with Cloudflare + Letsencrypt</h1>
+
+  <p align="center">
+    <a  href="https://github.com/Don-Cryptus/clippy/issues">Report Bug</a>
     ·
     <a href="https://github.com/Don-Cryptus/clippy/issues">Request Feature</a>
-    <br />
   </p>
-  <p align="center">
-  
-  </p>
+
 </p>
+
+## Prerequisites
+
+Docker, docker-compose, Cloudflare
+
+1. create .env like in .env.example
+
+   ```sh
+   touch .env
+   nano .env
+   ```
+
+2. TRAEFIK_USER_PASS can be created [here](https://www.web2generators.com/apache-tools/htpasswd-generator)
+
+3. CLOUDFLARE_DNS_API_TOKEN example is [here](https://developers.cloudflare.com/api/tokens/create/template/). **you need to be able to edit zone dns**
+
+4. **Important** Change the traefik path of your volume in docker-compose.yml
+
+5. if everything is configured correctly you can run docker
+
+   ```sh
+   docker-compose up -d
+   ```
+
+## Examples
+
+```yaml
+librespeed:
+image: ghcr.io/linuxserver/librespeed
+container_name: librespeed
+restart: unless-stopped
+ports:
+  - 80
+labels:
+  - 'traefik.enable=true'
+  - 'traefik.http.routers.librespeed.rule=Host(`librespeed.myngz.com`)'
+  - 'traefik.http.routers.librespeed.entrypoints=websecure'
+  - 'traefik.http.routers.librespeed.tls.certresolver=letsencrypt'
+```
