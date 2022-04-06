@@ -40,7 +40,7 @@ Docker, docker-compose, Cloudflare
 ## Examples
 
 ```yaml
-version: "3.8"
+version: '3.8'
 
 services:
   librespeed:
@@ -56,4 +56,9 @@ services:
     - 'traefik.http.routers.librespeed.rule=Host(`librespeed.myngz.com`)'
     - 'traefik.http.routers.librespeed.entrypoints=websecure'
     - 'traefik.http.routers.librespeed.tls.certresolver=letsencrypt'
+
+networks:
+  specific-network-name:
+    external: false
+    name: specific-network-name
 ```
