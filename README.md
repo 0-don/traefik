@@ -40,15 +40,20 @@ Docker, docker-compose, Cloudflare
 ## Examples
 
 ```yaml
-librespeed:
-image: ghcr.io/linuxserver/librespeed
-container_name: librespeed
-restart: unless-stopped
-ports:
-  - 80
-labels:
-  - 'traefik.enable=true'
-  - 'traefik.http.routers.librespeed.rule=Host(`librespeed.myngz.com`)'
-  - 'traefik.http.routers.librespeed.entrypoints=websecure'
-  - 'traefik.http.routers.librespeed.tls.certresolver=letsencrypt'
+version: "3.8"
+
+services:
+  librespeed:
+  image: ghcr.io/linuxserver/librespeed
+  container_name: librespeed
+  restart: unless-stopped
+  networks:
+    - proxy
+  ports:
+    - 80
+  labels:
+    - 'traefik.enable=true'
+    - 'traefik.http.routers.librespeed.rule=Host(`librespeed.myngz.com`)'
+    - 'traefik.http.routers.librespeed.entrypoints=websecure'
+    - 'traefik.http.routers.librespeed.tls.certresolver=letsencrypt'
 ```
