@@ -35,7 +35,7 @@ services:
       - proxy
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-      # Change traefik location to directory
+      # Change traefik location to your directory
       - ~/traefik:/letsencrypt
     labels:
       - traefik.enable=true
