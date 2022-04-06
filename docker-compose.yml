@@ -36,7 +36,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       # Change traefik location to your directory
-      - ~/traefik/cert:/letsencrypt
+      - ~/traefik:/letsencrypt
     labels:
       - traefik.enable=true
       - traefik.http.routers.traefik.rule=Host(`$TRAEFIK_DASHBOARD_HOST`)
