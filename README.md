@@ -62,3 +62,10 @@ networks:
     external: false
     name: proxy
 ```
+## More Examples
+
+1. [simple static html + nginx](https://github.com/Don-Cryptus/cashclock)
+2. [react html frontend + nginx & express backend](https://github.com/Don-Cryptus/pAlarm)
+3. [nextjs frontend & graphql backend](https://github.com/Don-Cryptus/echat)
+3. [graphql backend](https://github.com/Don-Cryptus/igdb-graphql)
+4. [portainer](https://github.com/Don-Cryptus/portainer)
