@@ -12,5 +12,17 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
+      
+      - name: Create env file
+        run: |
+          touch .env
+          echo CLOUDFLARE_DNS_API_TOKEN=${{ secrets.CLOUDFLARE_DNS_API_TOKEN }} >> .env
+          echo CLOUDFLARE_EMAIL=${{ secrets.CLOUDFLARE_EMAIL }} >> .env
+          echo TRAEFIK_ACME_EMAIL=${{ secrets.TRAEFIK_ACME_EMAIL }} >> .env
+          echo TRAEFIK_BASE_DNS=${{ secrets.TRAEFIK_BASE_DNS }} >> .env
+          echo TRAEFIK_DASHBOARD_HOST=${{ secrets.TRAEFIK_DASHBOARD_HOST }} >> .env
+          echo TRAEFIK_USER_PASS=${{ secrets.TRAEFIK_USER_PASS }} >> .env
+          cat .env
+
       - name: Docker run
         run: docker-compose up -d --force-recreate --build
