@@ -4,7 +4,7 @@ services:
   traefik:
     image: traefik:latest
     container_name: traefik
-    restart: unless-stopped
+    restart: always
     command:
       # Tell Traefik to discover containers using the Docker API
       - --providers.docker=true
