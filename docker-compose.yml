@@ -20,7 +20,7 @@ services:
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
       - --entrypoints.websecure.address=:443
-      - --entrypoints.postgres.address=:5432 # Postgres
+      - --entrypoints.coding-global-db.address=:5432 # Postgres
       # Set up the TLS configuration for our websecure listener
       - --entrypoints.websecure.http.tls=true
       - --entrypoints.websecure.http.tls.certResolver=letsencrypt
