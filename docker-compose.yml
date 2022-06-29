@@ -26,7 +26,7 @@ services:
       - --entrypoints.websecure.http.tls.certResolver=letsencrypt
       - --entrypoints.websecure.http.tls.domains[0].main=$TRAEFIK_BASE_DNS
       - --entrypoints.websecure.http.tls.domains[0].sans=*.$TRAEFIK_BASE_DNS
-      - --pilot.token=$TRAEFIK_PILOT_TOKEN
+      - --experimental.pilot.token="$TRAEFIK_PILOT_TOKEN"
     environment:
       - CLOUDFLARE_EMAIL=$CLOUDFLARE_EMAIL
       - CLOUDFLARE_DNS_API_TOKEN=$CLOUDFLARE_DNS_API_TOKEN
