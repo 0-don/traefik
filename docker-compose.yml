@@ -47,7 +47,7 @@ services:
       - traefik.http.routers.traefik.tls.certresolver=letsencrypt
       - traefik.http.routers.traefik.service=api@internal
       - traefik.http.routers.traefik.middlewares=traefik-auth
-      - traefik.http.middlewares.traefik-auth.basicauth.users="${TRAEFIK_USER_PASS}"
+      - traefik.http.middlewares.traefik-auth.basicauth.users=admin:$$2y$$05$$QgoabVnNBN3gR4wezwQovOm0glw00bQvUPORrYxz7.rI/rnw07cBG
 
 networks:
   proxy:
