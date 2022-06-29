@@ -22,6 +22,7 @@ jobs:
           echo TRAEFIK_BASE_DNS=${{ secrets.TRAEFIK_BASE_DNS }} >> .env
           echo TRAEFIK_DASHBOARD_HOST=${{ secrets.TRAEFIK_DASHBOARD_HOST }} >> .env
           echo TRAEFIK_USER_PASS=${{ secrets.TRAEFIK_USER_PASS }} >> .env
+          echo TRAEFIK_PILOT_TOKEN=${{ secrets.TRAEFIK_PILOT_TOKEN }} >> .env
           cat .env
 
       - name: Docker run
