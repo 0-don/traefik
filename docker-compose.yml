@@ -26,7 +26,6 @@ services:
       - --entrypoints.websecure.http.tls.certResolver=letsencrypt
       - --entrypoints.websecure.http.tls.domains[0].main=$TRAEFIK_BASE_DNS
       - --entrypoints.websecure.http.tls.domains[0].sans=*.$TRAEFIK_BASE_DNS
-      - --pilot.token=$TRAEFIK_PILOT_TOKEN
     environment:
       - CLOUDFLARE_EMAIL=$CLOUDFLARE_EMAIL
       - CLOUDFLARE_DNS_API_TOKEN=$CLOUDFLARE_DNS_API_TOKEN
@@ -47,7 +46,10 @@ services:
       - traefik.http.routers.traefik.tls.certresolver=letsencrypt
       - traefik.http.routers.traefik.service=api@internal
       - traefik.http.routers.traefik.middlewares=traefik-auth
-      - traefik.http.middlewares.traefik-auth.basicauth.users=admin:$$2y$$05$$QgoabVnNBN3gR4wezwQovOm0glw00bQvUPORrYxz7.rI/rnw07cBG
+      - traefik.http.middlewares.traefik-auth.basicauth.users=$TRAEFIK_USER_PASS
+
+pilot:
+  token: $TRAEFIK_PILOT_TOKEN
 
 networks:
   proxy:
