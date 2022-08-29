@@ -35,7 +35,7 @@ services:
       - 80:80
       - 443:443
       - 5432:5432 # Postgres discord bot
-      - 5433:5433 # Postgres savage scan
+      # - 5433:5433 # Postgres savage scan
     networks:
       - proxy
     volumes:
