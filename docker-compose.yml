@@ -21,8 +21,7 @@ services:
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
       - --entrypoints.websecure.address=:443
       - --entrypoints.coding-global-db.address=:5432 # Postgres discord bot
-      - --entrypoints.savagescan-db.address=:5433 # Postgres savage scan
-      - --entrypoints.checkout-db.address=:3306 # mysql savage scan
+      # - --entrypoints.savagescan-db.address=:5433 # Postgres savage scan
       # Set up the TLS configuration for our websecure listener
       - --entrypoints.websecure.http.tls=true
       - --entrypoints.websecure.http.tls.certResolver=letsencrypt
@@ -36,8 +35,7 @@ services:
       - 80:80
       - 443:443
       - 5432:5432 # Postgres discord bot
-      - 3306:3306 # mysql
-      - 5433:5433 # Postgres savage scan
+      # - 5433:5433 # Postgres savage scan
     networks:
       - proxy
     volumes:
