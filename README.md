@@ -27,7 +27,7 @@ Docker, docker-compose, Cloudflare
 
 2. TRAEFIK_USER_PASS can be created [here](https://www.web2generators.com/apache-tools/htpasswd-generator)
 
-3. CLOUDFLARE_DNS_API_TOKEN example is [here](https://developers.cloudflare.com/api/tokens/create/template/). **you need to be able to edit zone dns**
+3. CLOUDFLARE_DNS_API_TOKEN example is [here](https://dash.cloudflare.com/profile/api-tokens). **you need to be able to edit zone dns**
 
 4. **Important** Change the traefik path of your volume in docker-compose.yml
 
