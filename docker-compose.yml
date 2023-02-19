@@ -23,9 +23,6 @@ services:
       - --entrypoints.coding-global-db.address=:5432 # Postgres discord bot
       # - --entrypoints.savagescan-db.address=:5433 # Postgres savage scan
       # Set up the TLS configuration for our websecure listener
-
-      - --traefik.http.middlewares.test-ratelimit.ratelimit.average=100
-      - --traefik.http.middlewares.test-ratelimit.ratelimit.burst=50
       
       - --entrypoints.websecure.http.tls=true
       - --entrypoints.websecure.http.tls.certResolver=letsencrypt
