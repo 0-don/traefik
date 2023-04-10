@@ -53,7 +53,7 @@ services:
     - 80
   labels:
     - 'traefik.enable=true'
-    - 'traefik.http.routers.librespeed.rule=Host(`librespeed.myngz.com`)'
+    - 'traefik.http.routers.librespeed.rule=Host(`librespeed.coding.global`)'
     - 'traefik.http.routers.librespeed.entrypoints=websecure'
     - 'traefik.http.routers.librespeed.tls.certresolver=letsencrypt'
 
