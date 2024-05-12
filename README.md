@@ -40,8 +40,6 @@ Docker, docker-compose, Cloudflare
 ## Examples
 
 ```yaml
-version: '3.8'
-
 services:
   librespeed:
   image: ghcr.io/linuxserver/librespeed
