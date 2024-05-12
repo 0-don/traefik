@@ -49,13 +49,12 @@ services:
   restart: unless-stopped
   networks:
     - proxy
-  ports:
-    - 80
   labels:
     - 'traefik.enable=true'
     - 'traefik.http.routers.librespeed.rule=Host(`librespeed.coding.global`)'
     - 'traefik.http.routers.librespeed.entrypoints=websecure'
     - 'traefik.http.routers.librespeed.tls.certresolver=letsencrypt'
+    - 'traefik.http.services.librespeed.loadbalancer.server.port=80'
 
 networks:
   proxy:
