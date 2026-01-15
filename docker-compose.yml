@@ -8,31 +8,25 @@ services:
       - --providers.docker=true
       # Enable the Trafik dashboard
       - --api.dashboard=true
-      # Set up LetsEncrypt (HTTP challenge - no Cloudflare needed)
-      - --certificatesresolvers.letsencrypt.acme.httpchallenge=true
-      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+      # Set up LetsEncrypt
+      - --certificatesresolvers.letsencrypt.acme.dnschallenge=true
+      - --certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare
       - --certificatesresolvers.letsencrypt.acme.email=$TRAEFIK_ACME_EMAIL
       - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
-      # COMMENTED OUT - Cloudflare DNS challenge (uncomment to re-enable)
-      # - --certificatesresolvers.letsencrypt.acme.dnschallenge=true
-      # - --certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare
       # Set up an insecure listener that redirects all traffic to TLS
       - --entrypoints.web.address=:80
-      # COMMENTED OUT - HTTP to HTTPS redirect (disabled while testing without SSL)
-      # - --entrypoints.web.http.redirections.entrypoint.to=websecure
-      # - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
       - --entrypoints.websecure.address=:443
       # Set up the TLS configuration for our websecure listener
 
       - --entrypoints.websecure.http.tls=true
       - --entrypoints.websecure.http.tls.certResolver=letsencrypt
-      # COMMENTED OUT - Wildcard cert requires DNS challenge
-      # - --entrypoints.websecure.http.tls.domains[0].main=$TRAEFIK_BASE_DNS
-      # - --entrypoints.websecure.http.tls.domains[0].sans=*.$TRAEFIK_BASE_DNS
-    # COMMENTED OUT - Cloudflare environment variables (uncomment to re-enable)
-    # environment:
-    #   - CLOUDFLARE_EMAIL=$CLOUDFLARE_EMAIL
-    #   - CLOUDFLARE_DNS_API_TOKEN=$CLOUDFLARE_DNS_API_TOKEN
+      - --entrypoints.websecure.http.tls.domains[0].main=$TRAEFIK_BASE_DNS
+      - --entrypoints.websecure.http.tls.domains[0].sans=*.$TRAEFIK_BASE_DNS
+    environment:
+      - CLOUDFLARE_EMAIL=$CLOUDFLARE_EMAIL
+      - CLOUDFLARE_DNS_API_TOKEN=$CLOUDFLARE_DNS_API_TOKEN
     ports:
       - 80:80
       - 443:443
