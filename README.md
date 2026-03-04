@@ -37,6 +37,73 @@ Docker, docker-compose, Cloudflare
    docker-compose up -d
    ```
 
+## Cloudflare Tunnel Setup
+
+This setup routes all traffic through a Cloudflare Tunnel, meaning ports 80 and 443 are never exposed to the public internet. The `cloudflared` container connects outbound to Cloudflare, and Cloudflare forwards requests back through the tunnel to Traefik.
+
+### 1. Create a Tunnel
+
+Go to [Cloudflare Zero Trust](https://one.dash.cloudflare.com/) > Networks > Tunnels > Create a tunnel. Select **Cloudflared** as the connector type.
+
+### 2. Configure Public Hostnames
+
+In the tunnel settings, add public hostname entries for each domain. For each entry:
+
+| Field    | Value              |
+| -------- | ------------------ |
+| Hostname | `*.yourdomain.com` |
+| Type     | HTTPS              |
+| URL      | `traefik:443`      |
+
+Enable **No TLS Verify** under "Additional application settings > TLS" since `cloudflared` connects via Docker internal DNS (`traefik`) which won't match the certificate hostname.
+
+Add entries for both the wildcard (`*.yourdomain.com`) and the apex (`yourdomain.com`) for each domain.
+
+### 3. Update DNS Records
+
+All DNS records must point to the tunnel instead of your server IP. Replace any A records with CNAME records:
+
+| Type  | Name | Content                                    | Proxied |
+| ----- | ---- | ------------------------------------------ | ------- |
+| CNAME | `@`  | `<tunnel-id>.cfargotunnel.com` | Yes     |
+| CNAME | `*`  | `<tunnel-id>.cfargotunnel.com` | Yes     |
+
+You can find your tunnel ID in the Zero Trust dashboard or by running `cloudflared tunnel list`.
+
+### 4. Add the Tunnel Token
+
+Copy the tunnel token from the Zero Trust dashboard and add it to your `.env`:
+
+```sh
+CLOUDFLARE_TUNNEL_TOKEN=eyJhIjoiN2...
+```
+
+If using GitHub Actions, also add `CLOUDFLARE_TUNNEL_TOKEN` as a repository secret.
+
+### 5. Firewall
+
+Since traffic now flows through the tunnel, block ports 80 and 443 at the OS level as a safety net:
+
+```sh
+ufw deny 80
+ufw deny 443
+```
+
+The docker-compose already binds these ports to `127.0.0.1` only, but OS level firewall rules provide an extra layer of protection.
+
+### 6. Deploy
+
+```sh
+docker compose up -d
+```
+
+Verify the tunnel is healthy:
+
+```sh
+docker logs cloudflared
+# Should show "Registered tunnel connection" messages
+```
+
 ## Examples
 
 ```yaml
