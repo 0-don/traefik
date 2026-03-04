@@ -5,6 +5,8 @@ services:
     restart: always
     depends_on:
       - crowdsec
+    mem_limit: 16g
+    memswap_limit: 16g
     command:
       - --providers.docker=true
       - --providers.file.directory=/etc/traefik/dynamic
@@ -71,6 +73,7 @@ services:
     image: crowdsecurity/crowdsec:latest
     container_name: crowdsec
     restart: always
+    cpus: 0.5
     labels:
       - traefik.enable=false
     environment:

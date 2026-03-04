@@ -48,21 +48,22 @@ services:
   networks:
     - proxy
   labels:
-    - 'traefik.enable=true'
-    - 'traefik.http.routers.librespeed.rule=Host(`librespeed.coding.global`)'
-    - 'traefik.http.routers.librespeed.entrypoints=websecure'
-    - 'traefik.http.routers.librespeed.tls.certresolver=letsencrypt'
-    - 'traefik.http.services.librespeed.loadbalancer.server.port=80'
+    - "traefik.enable=true"
+    - "traefik.http.routers.librespeed.rule=Host(`librespeed.coding.global`)"
+    - "traefik.http.routers.librespeed.entrypoints=websecure"
+    - "traefik.http.routers.librespeed.tls.certresolver=letsencrypt"
+    - "traefik.http.services.librespeed.loadbalancer.server.port=80"
 
 networks:
   proxy:
     external: false
     name: proxy
 ```
+
 ## More Examples
 
 1. [simple static html + nginx](https://github.com/0-don/cashclock)
 2. [react html frontend + nginx & express backend](https://github.com/0-don/pAlarm)
 3. [nextjs frontend & graphql backend](https://github.com/0-don/echat)
-3. [graphql backend](https://github.com/0-don/igdb-graphql)
-4. [portainer](https://github.com/0-don/portainer)
+4. [graphql backend](https://github.com/0-don/igdb-graphql)
+5. [portainer](https://github.com/0-don/portainer)
