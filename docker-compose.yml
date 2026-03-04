@@ -77,6 +77,26 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 
+  # One-shot container that tunes kernel params for DDoS resilience.
+  # Runs at every `docker compose up`, exits immediately after applying.
+  sysctl-init:
+    image: alpine:latest
+    container_name: sysctl-init
+    privileged: true
+    restart: "no"
+    labels:
+      - traefik.enable=false
+    command:
+      - sh
+      - -c
+      - |
+        sysctl -w net.netfilter.nf_conntrack_max=1048576
+        sysctl -w net.netfilter.nf_conntrack_buckets=262144
+        sysctl -w net.netfilter.nf_conntrack_tcp_timeout_time_wait=30
+        sysctl -w net.netfilter.nf_conntrack_tcp_timeout_established=300
+        sysctl -w net.netfilter.nf_conntrack_tcp_timeout_close_wait=10
+    networks: []
+
   crowdsec:
     image: crowdsecurity/crowdsec:latest
     container_name: crowdsec
