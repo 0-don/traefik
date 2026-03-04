@@ -83,7 +83,7 @@ ssh don@$SERVER_IP "docker exec crowdsec cscli decisions delete --ip <IP>"
 | # | Name | Action | Expression |
 |---|------|--------|------------|
 | 1 | Allow IndexNow | skip | `http.request.uri.path eq "/fa52fd419e4c203cf499dabb0beaa1fe.txt"` |
-| 2 | Block DDoS patterns | block | `(http.request.uri.query contains "cb=") or (http.x_forwarded_for contains ",") or (http.user_agent eq "" and not http.request.uri.path contains "/api/")` |
+| 2 | Block DDoS patterns | block | `(http.request.uri.query contains "cb=") or (http.x_forwarded_for contains ",") or (http.user_agent eq "") or (http.request.method eq "HEAD" and not cf.client.bot)` |
 | 3 | Challenge high threat score | managed_challenge | `(not cf.client.bot and cf.threat_score gt 10)` |
 | 4 | Challenge datacenter traffic | managed_challenge | `(not cf.client.bot and ip.src.asnum in {13238 14061 15169 16276 24940 32934 36352 45102 55286 63949 197540 39351})` |
 
@@ -165,9 +165,9 @@ curl -s -X PATCH "https://api.cloudflare.com/client/v4/zones/$ZONE_CG/settings/s
 ## Known Attack Patterns (March 2026)
 
 ### Wave 1: Empty user agent botnet
-- 133K+ unique IPs, ~100 requests each
-- GET `/` and `/en`, no user agent, HTTP/2.0
-- 499 responses (client disconnects after holding connection 10s+)
+- 199K+ unique IPs, GET `/` and `/en`
+- Empty user agent, HTTP/2.0, 499 responses
+- Peak: 179K req/min, multiple waves over hours
 - Blocked by: `http.user_agent eq ""`
 
 ### Wave 2: Cache buster with spoofed IPs
@@ -179,6 +179,12 @@ curl -s -X PATCH "https://api.cloudflare.com/client/v4/zones/$ZONE_CG/settings/s
 - Changed `_cb=` to `cb=` (dropped underscore)
 - Added random garbage paths: `/HZvoJf?cb=XYZ`
 - Blocked by: `contains "cb="` (catches both variants)
+
+### Wave 4: Garbage path flood
+- 105K+ unique IPs, `/fuckyyou` with legit-looking params (`?utm_medium=`, `?rnd=`, `?rev=`)
+- Mixed GET/POST/HEAD, empty user agent
+- Peak: 205K req/min, ran simultaneously with Wave 1
+- Blocked by: empty UA rule + HEAD block
 
 ## Useful Cloudflare Expression Fields (Free Plan)
 

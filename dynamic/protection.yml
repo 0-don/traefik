@@ -1,16 +1,16 @@
 http:
   middlewares:
-    # Limits concurrent requests to a backend, returns 429 when exceeded.
-    # Prevents one service from consuming all of Traefik's resources.
+    # Global concurrent request limit for a service (not per-IP).
+    # Prevents one overwhelmed backend from consuming all Traefik connections.
     inflight-limit:
       inFlightReq:
-        amount: 200
-        sourceCriterion:
-          ipStrategy:
-            depth: 1
+        amount: 100
 
     # Stops forwarding to a backend that is failing, returns 503 fast.
-    # Prevents request queuing from cascading to other services.
+    # LatencyAtQuantileMS catches the 125-second response times from DDoS.
     circuit-breaker:
       circuitBreaker:
-        expression: "ResponseCodeRatio(500, 600, 0, 600) > 0.50 || NetworkErrorRatio() > 0.10"
+        expression: "LatencyAtQuantileMS(50.0) > 5000 || ResponseCodeRatio(500, 600, 0, 600) > 0.30 || NetworkErrorRatio() > 0.10"
+        checkPeriod: 10s
+        fallbackDuration: 15s
+        recoveryDuration: 30s
