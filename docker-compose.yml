@@ -6,32 +6,28 @@ services:
     depends_on:
       - crowdsec
     command:
-      # Tell Traefik to discover containers using the Docker API
       - --providers.docker=true
-      # Load dynamic config files (CrowdSec middleware)
       - --providers.file.directory=/etc/traefik/dynamic
-      # Enable the Trafik dashboard
       - --api.dashboard=true
-      # Set up LetsEncrypt
+      # LetsEncrypt
       - --certificatesresolvers.letsencrypt.acme.dnschallenge=true
       - --certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare
       - --certificatesresolvers.letsencrypt.acme.email=$TRAEFIK_ACME_EMAIL
       - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
-      # Set up an insecure listener that redirects all traffic to TLS
+      # Entrypoints
       - --entrypoints.web.address=:80
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
       - --entrypoints.websecure.address=:443
-      # Set up the TLS configuration for our websecure listener
       - --entrypoints.websecure.http.tls=true
       - --entrypoints.websecure.http.tls.certResolver=letsencrypt
       - --entrypoints.websecure.http.tls.domains[0].main=$TRAEFIK_BASE_DNS
       - --entrypoints.websecure.http.tls.domains[0].sans=*.$TRAEFIK_BASE_DNS
-      # Trust Cloudflare IPs so X-Forwarded-For contains real client IP
+      # Trust Cloudflare IPs for real client IP
       - --entrypoints.websecure.forwardedHeaders.trustedIPs=173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22
-      # Apply CrowdSec bouncer to all HTTPS requests
+      # CrowdSec bouncer on all HTTPS requests
       - --entrypoints.websecure.http.middlewares=crowdsec@file
-      # Access logging (CrowdSec reads these)
+      # Access logs for CrowdSec
       - --accesslog=true
       - --accesslog.filepath=/var/log/traefik/access.log
       # CrowdSec bouncer plugin
@@ -67,7 +63,7 @@ services:
       - traefik.enable=false
     environment:
       COLLECTIONS: "crowdsecurity/traefik crowdsecurity/http-cve crowdsecurity/http-dos"
-      BOUNCER_KEY_traefik: $CROWDSEC_BOUNCER_KEY
+      BOUNCER_KEY_traefik: "052ee0b1e0cf335d096ef25f5586491ec7bf217cddd7dc6e26ec215813e74f53"
     volumes:
       - ./crowdsec/acquis.yaml:/etc/crowdsec/acquis.yaml
       - crowdsec-db:/var/lib/crowdsec/data/
