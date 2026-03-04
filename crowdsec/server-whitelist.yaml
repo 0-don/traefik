@@ -1,0 +1,6 @@
+name: server-ip-whitelist
+description: Whitelist server IP to prevent self-banning from internal API traffic
+whitelist:
+  reason: Server self-traffic
+  ip:
+    - ${SERVER_IP}

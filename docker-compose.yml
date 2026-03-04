@@ -82,6 +82,8 @@ services:
       BOUNCER_KEY_traefik: "052ee0b1e0cf335d096ef25f5586491ec7bf217cddd7dc6e26ec215813e74f53"
     volumes:
       - ./crowdsec/acquis.yaml:/etc/crowdsec/acquis.yaml
+      - ./crowdsec/server-whitelist.yaml:/etc/crowdsec/parsers/s02-enrich/server-whitelist.yaml
+      - ./crowdsec/server-whitelist.yaml:/etc/crowdsec/postoverflows/s01-whitelist/server-whitelist.yaml
       - crowdsec-db:/var/lib/crowdsec/data/
       - crowdsec-config:/etc/crowdsec/
       - traefik-logs:/var/log/traefik:ro
