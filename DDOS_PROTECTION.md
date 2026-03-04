@@ -6,7 +6,7 @@
 Client -> Cloudflare Edge (WAF rules, DDoS L7) -> Traefik (CrowdSec bouncer) -> Backend
 ```
 
-Cloudflare blocks at the edge. CrowdSec catches what slips through. Backend containers have memory limits so one site going down does not take the server with it.
+Cloudflare blocks at the edge. CrowdSec catches what slips through. Traefik middlewares isolate services so one overwhelmed backend cannot starve others. Kernel conntrack tuning prevents connection table exhaustion. Backend containers have memory limits.
 
 ## Quick Reference
 
@@ -241,9 +241,58 @@ Traefik and backend containers have memory limits to prevent one service from cr
 
 | Container | Memory | CPU |
 |-----------|--------|-----|
-| traefik | 16GB | 4 cores |
+| traefik | 16GB | 6 cores |
 | crowdsec | no limit | 0.5 cores |
 | coding-global-web | 2GB | no limit |
+
+## Kernel Conntrack Tuning
+
+During large DDoS attacks (18K+ req/sec), the Linux conntrack table fills up and the kernel drops ALL new connections, taking down every site on the server. The `sysctl-init` container in docker-compose sets these params at startup:
+
+| Parameter | Value | Why |
+|-----------|-------|-----|
+| `nf_conntrack_max` | 2,097,152 | Default 262K fills up during attacks |
+| `nf_conntrack_buckets` | 262,144 | Hash table size for lookup performance |
+| `nf_conntrack_tcp_timeout_time_wait` | 30s | Default 120s, faster cleanup of closed connections |
+| `nf_conntrack_tcp_timeout_established` | 300s | Default 432000s (5 days), frees stale entries |
+| `nf_conntrack_tcp_timeout_close_wait` | 10s | Default 60s, faster cleanup |
+
+### Check conntrack during an attack
+
+```bash
+# Current usage vs max
+cat /proc/sys/net/netfilter/nf_conntrack_count
+cat /proc/sys/net/netfilter/nf_conntrack_max
+
+# Emergency increase (if sysctl-init hasn't run)
+sudo sysctl -w net.netfilter.nf_conntrack_max=2097152
+```
+
+## Traefik Protection Middlewares
+
+Defined in `dynamic/protection.yml`, applied per-service via Docker labels.
+
+### inflight-limit
+- Caps total concurrent requests to a service at 100 (global, not per-IP)
+- Returns 429 immediately when exceeded
+- Prevents one overwhelmed backend from consuming all Traefik connections
+
+### circuit-breaker
+- Trips when median response time > 5s, or 30% 5xx, or 10% network errors
+- Returns 503 immediately for 15s, then probes for recovery
+- Prevents request queuing from cascading to other services
+
+### Backend timeouts (static config)
+- `responseHeaderTimeout=15s`: Kills backend connections with no response after 15s
+- `readTimeout=30s` / `writeTimeout=30s`: Entrypoint level connection timeouts
+- `dialTimeout=5s`: Backend must accept connection within 5s
+
+### Apply to a service
+
+Add to the service's Docker labels:
+```yaml
+- "traefik.http.routers.<name>.middlewares=inflight-limit@file,circuit-breaker@file"
+```
 
 ## CrowdSec Server IP Whitelist
 

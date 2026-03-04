@@ -83,6 +83,8 @@ services:
     image: alpine:latest
     container_name: sysctl-init
     privileged: true
+    pid: host
+    network_mode: host
     restart: "no"
     labels:
       - traefik.enable=false
@@ -90,12 +92,11 @@ services:
       - sh
       - -c
       - |
-        sysctl -w net.netfilter.nf_conntrack_max=2097152
+        sysctl -w net.netfilter.nf_conntrack_max=2097153
         sysctl -w net.netfilter.nf_conntrack_buckets=262144
         sysctl -w net.netfilter.nf_conntrack_tcp_timeout_time_wait=30
         sysctl -w net.netfilter.nf_conntrack_tcp_timeout_established=300
         sysctl -w net.netfilter.nf_conntrack_tcp_timeout_close_wait=10
-    networks: []
 
   crowdsec:
     image: crowdsecurity/crowdsec:latest
