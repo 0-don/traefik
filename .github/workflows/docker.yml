@@ -15,6 +15,7 @@ jobs:
       - name: Create env file
         run: |
           touch .env
+          echo CLOUDFLARE_TUNNEL_TOKEN=${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }} >> .env
           echo CLOUDFLARE_DNS_API_TOKEN=${{ secrets.CLOUDFLARE_DNS_API_TOKEN }} >> .env
           echo CLOUDFLARE_EMAIL=${{ secrets.CLOUDFLARE_EMAIL }} >> .env
           echo TRAEFIK_ACME_EMAIL=${{ secrets.TRAEFIK_ACME_EMAIL }} >> .env

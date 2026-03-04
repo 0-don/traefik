@@ -47,8 +47,8 @@ services:
       - CLOUDFLARE_EMAIL=$CLOUDFLARE_EMAIL
       - CLOUDFLARE_DNS_API_TOKEN=$CLOUDFLARE_DNS_API_TOKEN
     ports:
-      - 80:80
-      - 443:443
+      - "127.0.0.1:80:80"
+      - "127.0.0.1:443:443"
     networks:
       - proxy
     volumes:
@@ -117,6 +117,18 @@ services:
       - traefik-logs:/var/log/traefik:ro
     networks:
       - proxy
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    restart: always
+    command: tunnel run
+    environment:
+      - TUNNEL_TOKEN=$CLOUDFLARE_TUNNEL_TOKEN
+    networks:
+      - proxy
+    labels:
+      - traefik.enable=false
 
 volumes:
   traefik-logs:
