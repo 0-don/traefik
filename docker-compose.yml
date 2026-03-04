@@ -55,6 +55,18 @@ services:
       - traefik.http.routers.traefik.middlewares=traefik-auth
       - traefik.http.middlewares.traefik-auth.basicauth.users=admin:$$2y$$05$$QgoabVnNBN3gR4wezwQovOm0glw00bQvUPORrYxz7.rI/rnw07cBG
 
+  autoheal:
+    image: willfarrell/autoheal
+    container_name: autoheal
+    restart: always
+    labels:
+      - traefik.enable=false
+    environment:
+      AUTOHEAL_CONTAINER_LABEL: all
+      AUTOHEAL_INTERVAL: 30
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
   crowdsec:
     image: crowdsecurity/crowdsec:latest
     container_name: crowdsec
