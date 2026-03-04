@@ -63,6 +63,8 @@ services:
     image: crowdsecurity/crowdsec:latest
     container_name: crowdsec
     restart: always
+    labels:
+      - traefik.enable=false
     environment:
       COLLECTIONS: "crowdsecurity/traefik crowdsecurity/http-cve crowdsecurity/http-dos"
       BOUNCER_KEY_traefik: $CROWDSEC_BOUNCER_KEY
