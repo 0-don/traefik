@@ -1,6 +1,7 @@
 name: server-ip-whitelist
-description: Whitelist server IP to prevent self-banning from internal API traffic
+description: Whitelist server and admin IPs to prevent banning from internal traffic
 whitelist:
-  reason: Server self-traffic
+  reason: Server and admin traffic
   ip:
     - ${SERVER_IP}
+    - 185.209.196.213
