@@ -1,0 +1,16 @@
+http:
+  middlewares:
+    # Limits concurrent requests to a backend, returns 429 when exceeded.
+    # Prevents one service from consuming all of Traefik's resources.
+    inflight-limit:
+      inFlightReq:
+        amount: 200
+        sourceCriterion:
+          ipStrategy:
+            depth: 1
+
+    # Stops forwarding to a backend that is failing, returns 503 fast.
+    # Prevents request queuing from cascading to other services.
+    circuit-breaker:
+      circuitBreaker:
+        expression: "ResponseCodeRatio(500, 600, 0, 600) > 0.50 || NetworkErrorRatio() > 0.10"
