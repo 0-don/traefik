@@ -3,10 +3,10 @@
 ## Architecture
 
 ```
-Client -> Cloudflare Edge (WAF rules, DDoS L7) -> Traefik (CrowdSec bouncer) -> Backend
+Client -> Cloudflare Edge (WAF + DDoS L7) -> Kernel (conntrack) -> Traefik (CrowdSec + middlewares) -> Backend
 ```
 
-Cloudflare blocks at the edge. CrowdSec catches what slips through. Traefik middlewares isolate services so one overwhelmed backend cannot starve others. Kernel conntrack tuning prevents connection table exhaustion. Backend containers have memory limits.
+Cloudflare blocks at the edge. Kernel conntrack tuning prevents connection table exhaustion. Traefik middlewares isolate services so one overwhelmed backend cannot starve others. CrowdSec catches what slips through. Backend containers have memory limits.
 
 ## Quick Reference
 
@@ -30,6 +30,12 @@ curl -s "https://api.cloudflare.com/client/v4/graphql" \
   --data "{
     \"query\": \"{ viewer { zones(filter: {zoneTag: \\\"$ZONE_CG\\\"}) { httpRequests1hGroups(limit: 3, filter: {datetime_geq: \\\"$(date -u -d '3 hours ago' +%Y-%m-%dT%H:%M:%SZ)\\\", datetime_leq: \\\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\\\"}, orderBy: [datetime_ASC]) { dimensions { datetime } sum { requests threats responseStatusMap { edgeResponseStatus requests } } } } } }\"
   }" | jq '.data.viewer.zones[0].httpRequests1hGroups[] | {hour: .dimensions.datetime, requests: .sum.requests, threats: .sum.threats}'
+
+# Conntrack table (if near max, ALL sites go down)
+ssh don@$SERVER_IP "cat /proc/sys/net/netfilter/nf_conntrack_count && echo '/' && cat /proc/sys/net/netfilter/nf_conntrack_max"
+
+# Traefik CPU (>300% means attack traffic is overwhelming)
+ssh don@$SERVER_IP "docker stats --no-stream traefik"
 ```
 
 ### Server side logs
@@ -53,8 +59,11 @@ ssh don@$SERVER_IP "docker exec traefik cat /var/log/traefik/access.log | grep -
 # Check user agents (empty UA = bot)
 ssh don@$SERVER_IP 'docker exec traefik cat /var/log/traefik/access.log | grep -c "\"\" \"-\""'
 
-# Check for cache buster params
-ssh don@$SERVER_IP "docker exec traefik tail -100 /var/log/traefik/access.log | grep 'cb='"
+# Unique IPs
+ssh don@$SERVER_IP "docker exec traefik cat /var/log/traefik/access.log | awk '{print \$1}' | sort -u | wc -l"
+
+# Which backend services are being hit
+ssh don@$SERVER_IP "docker exec traefik cat /var/log/traefik/access.log | grep -oP '\"[^\"]*@docker\"' | sort | uniq -c | sort -rn"
 ```
 
 ### CrowdSec
@@ -72,13 +81,13 @@ ssh don@$SERVER_IP "docker exec crowdsec cscli alerts inspect <ID>"
 # Manually ban an IP
 ssh don@$SERVER_IP "docker exec crowdsec cscli decisions add --ip <IP> --duration 24h --reason 'manual DDoS ban'"
 
-# Remove a ban (e.g. self-ban)
+# Remove a ban (e.g. self-ban or false positive)
 ssh don@$SERVER_IP "docker exec crowdsec cscli decisions delete --ip <IP>"
 ```
 
-## Current Cloudflare Rules (Free Plan: 5 custom, 1 rate limit)
+## Current Cloudflare Rules
 
-### Custom Rules (4/5 used)
+### coding.global (4/5 custom rules used)
 
 | # | Name | Action | Expression |
 |---|------|--------|------------|
@@ -87,16 +96,25 @@ ssh don@$SERVER_IP "docker exec crowdsec cscli decisions delete --ip <IP>"
 | 3 | Challenge high threat score | managed_challenge | `(not cf.client.bot and cf.threat_score gt 10)` |
 | 4 | Challenge datacenter traffic | managed_challenge | `(not cf.client.bot and ip.src.asnum in {13238 14061 15169 16276 24940 32934 36352 45102 55286 63949 197540 39351})` |
 
-### Rate Limiting (1/1 used)
+### unorouter.ai (4/5 custom rules used)
+
+| # | Name | Action | Expression |
+|---|------|--------|------------|
+| 1 | Skip WAF for API gateway | skip | `(http.host eq "api.unorouter.ai")` |
+| 2 | Block DDoS patterns | block | Same as coding.global rule 2 |
+| 3 | Challenge high threat score | managed_challenge | Same as coding.global rule 3 |
+| 4 | Challenge datacenter traffic | managed_challenge | Same as coding.global rule 4 |
+
+### Rate Limiting (1/1 used, both zones)
 
 100 requests per 10 seconds per IP per colo, action: block.
 
-### Other Settings
+### Other Settings (both zones)
 
 - Security level: high
 - Bot Fight Mode: enabled
 - Crawler protection: enabled
-- DDoS L7 override: block at default sensitivity
+- DDoS L7 override: block at low sensitivity (most aggressive)
 
 ## How to Update Rules During an Attack
 
@@ -110,12 +128,13 @@ ssh don@$SERVER_IP "docker exec traefik tail -200 /var/log/traefik/access.log | 
 ```
 
 Common attack fingerprints to look for:
-- Query params (`?cb=`, `?_cb=`, random strings)
+- Query params (`?cb=`, `?_cb=`, `?ts=`, `?rnd=`, `?cachebypass=`)
 - Empty user agent (`"-"`)
 - Double IPs in the source (`1.2.3.4,5.6.7.8`)
-- Random garbage paths (`/HZvoJf`, `/z4uYwR`)
+- Random garbage paths (`/HZvoJf`, `/fuckyyou`)
 - Specific HTTP method or version
 - All hitting one backend service
+- 499 flood (fire and forget pattern)
 
 ### 2. Update the block rule
 
@@ -146,6 +165,8 @@ curl -s -X PATCH "https://api.cloudflare.com/client/v4/zones/$ZONE_CG/rulesets/$
 
 ### 3. Emergency: enable Under Attack Mode
 
+Note: UAM adds a JS challenge that blocks API clients. Do NOT enable on unorouter.ai.
+
 ```bash
 curl -s -X PATCH "https://api.cloudflare.com/client/v4/zones/$ZONE_CG/settings/security_level" \
   -H "X-Auth-Email: $EMAIL" -H "X-Auth-Key: $KEY" \
@@ -162,88 +183,77 @@ curl -s -X PATCH "https://api.cloudflare.com/client/v4/zones/$ZONE_CG/settings/s
   --data '{"value":"high"}'
 ```
 
-## Known Attack Patterns (March 2026)
+## Attack Analysis: March 4, 2026
 
-### Wave 1: Empty user agent botnet
-- 199K+ unique IPs, GET `/` and `/en`
-- Empty user agent, HTTP/2.0, 499 responses
-- Peak: 179K req/min, multiple waves over hours
-- Blocked by: `http.user_agent eq ""`
+### Overall Scale
 
-### Wave 2: Cache buster with spoofed IPs
-- Query params: `?_=<timestamp>&r=<random>&_cb=<random>`
-- Double IPs in X-Forwarded-For: `9.218.248.68,189.50.33.120`
-- Blocked by: `contains "_cb="` and `x_forwarded_for contains ","`
+| Metric | Value |
+|---|---|
+| Total requests (at origin) | 2,076,384 |
+| Total unique IPs | 479,514 |
+| Duration | 14:15 to 19:02 UTC (~5 hours) |
+| Peak req/sec | 18,952 |
+| Target | coding-global-web (96.7% of all traffic) |
+| Botnet signature | 100% empty UA, 100% HTTP/2.0, IPv4+IPv6 |
+| Avg requests per IP | ~4.3 (highly distributed, per-IP limits useless) |
 
-### Wave 3: Adapted cache buster
-- Changed `_cb=` to `cb=` (dropped underscore)
-- Added random garbage paths: `/HZvoJf?cb=XYZ`
-- Blocked by: `contains "cb="` (catches both variants)
+### Response Code Breakdown
 
-### Wave 4: Garbage path flood
-- 105K+ unique IPs, `/fuckyyou` with legit-looking params (`?utm_medium=`, `?rnd=`, `?rev=`)
-- Mixed GET/POST/HEAD, empty user agent
-- Peak: 205K req/min, ran simultaneously with Wave 1
-- Blocked by: empty UA rule + HEAD block
+| Code | Count | % | Meaning |
+|---|---|---|---|
+| 499 | 1,327,555 | 63.9% | Client disconnected (botnet fire and forget) |
+| 429 | 286,889 | 13.8% | Rate limited by inflight-limit |
+| 307 | 282,156 | 13.6% | Redirect (reached backend) |
+| 403 | 80,006 | 3.9% | Blocked by CrowdSec |
+| 404 | 58,762 | 2.8% | Not found (reached backend) |
+| 504 | 16,587 | 0.8% | Gateway timeout (responseHeaderTimeout=15s) |
+| 200 | 12,067 | 0.6% | Success (reached backend) |
+| 502 | 6,183 | 0.3% | Bad gateway |
+| 503 | 3,162 | 0.2% | Circuit breaker tripped |
+| 500 | 2,412 | 0.1% | Internal server error |
 
-## Useful Cloudflare Expression Fields (Free Plan)
+### Wave 1: Empty UA Volumetric Flood (14:15 to 17:59 UTC)
 
-| Field | Description |
-|-------|-------------|
-| `http.request.uri.path` | Request path |
-| `http.request.uri.query` | Query string |
-| `http.user_agent` | User agent header |
-| `http.x_forwarded_for` | X-Forwarded-For header |
-| `cf.client.bot` | Known good bot (Google, Bing etc.) |
-| `cf.threat_score` | Cloudflare threat score (0-100, higher = worse) |
-| `ip.src` | Source IP |
-| `ip.src.asnum` | Source ASN number |
-| `ip.src.country` | Source country code |
-| `http.request.method` | HTTP method (GET, POST etc.) |
-| `http.request.version` | HTTP version |
-| `ssl` | Whether request used HTTPS |
+- **~1.2M requests** targeting `/` and `/en`
+- **479K+ unique IPs**, avg ~4.3 requests per IP
+- Peak burst: **192K req/min** at 16:26, **18,952 req/sec**
+- 79% resulted in 499 (fire and forget, client disconnects immediately)
+- No query params, pure volumetric flood
+- Timeline: initial burst at 14:23, lull until 16:20, massive spike 16:20 to 16:28
+- Blocked by: `http.user_agent eq ""` at Cloudflare edge (millions blocked, thousands overflow)
 
-**Not available on free plan:** `matches` (regex), `cf.bot_management.score`, WAF attack score.
+### Wave 2: /fuckyyou Cache Buster (18:00 to 19:00 UTC)
 
-## Datacenter ASN List
+- **868K requests** targeting `/fuckyyou` and `/en/fuckyyou`
+- **237K unique IPs**
+- Mixed methods: GET 67.6%, POST 22.7%, HEAD 9.7%
+- Cache-busting query params: `ts`, `param1`, `v`, `rnd`, `cachebypass`, `_`
+- Average response time: **6.6 seconds** (many tied up backend for 5 to 60s)
+- 33% caught by rate limiting (429), 7.5% by CrowdSec (403)
+- Blocked by: empty UA rule at edge + inflight-limit + circuit-breaker at origin
 
-These are hosting/VPN providers commonly used by botnets:
+### Earlier Waves (from previous sessions)
 
-| ASN | Provider |
-|-----|----------|
-| 13238 | Yandex |
-| 14061 | DigitalOcean |
-| 15169 | Google Cloud |
-| 16276 | OVH |
-| 24940 | Hetzner |
-| 32934 | Facebook/Meta |
-| 36352 | ColoCrossing |
-| 45102 | Alibaba |
-| 55286 | Tatar Telecom |
-| 63949 | Linode/Akamai |
-| 197540 | netcup |
-| 39351 | 31173 Services |
+**Wave 2 (earlier):** Cache buster with spoofed IPs. Params: `?_=<timestamp>&r=<random>&_cb=<random>`. Double IPs in XFF. Blocked by: `contains "_cb="` and `x_forwarded_for contains ","`
 
-## Free Plan Limits
+**Wave 3 (earlier):** Adapted cache buster. Changed `_cb=` to `cb=`, added random garbage paths. Blocked by: `contains "cb="`
 
-- 5 custom WAF rules (active + inactive count)
-- 1 rate limiting rule
-- No regex (`matches` operator)
-- No `managed_challenge` in rate limiting (block only)
-- Rate limit mitigation timeout fixed at 10 seconds
-- No AI bot protection
-- No WAF attack score
-- DDoS L7 managed rules: full access, customizable
+## Lessons Learned
 
-## Container Resource Limits
+### Conntrack exhaustion is the silent killer
+The conntrack table at default 262K filled up during the attack (247K/262K). When full, the kernel drops ALL new TCP connections for every service on the server. This was the root cause of unorouter.ai going down during a coding.global attack. Fixed by increasing to 2M via the `sysctl-init` container.
 
-Traefik and backend containers have memory limits to prevent one service from crashing the entire server:
+### Per-IP rate limiting is useless against distributed botnets
+With 479K unique IPs each sending ~4 requests, per-IP limits never trigger. The inflight-limit must be **global** (total concurrent requests to a service) to have any effect.
 
-| Container | Memory | CPU |
-|-----------|--------|-----|
-| traefik | 16GB | 6 cores |
-| crowdsec | no limit | 0.5 cores |
-| coding-global-web | 2GB | no limit |
+### The 499 fire-and-forget signature
+63.9% of attack requests resulted in 499 (client disconnected). The botnet sends the request and immediately drops the connection. The backend still begins processing, consuming resources. The `responseHeaderTimeout=15s` prevents these from hanging for 125+ seconds.
+
+### CrowdSec false-positive cascade
+During the attack, mass 403 responses triggered CrowdSec's `http-probing` scenario, which started banning legitimate residential IPs caught in the crossfire. Watch for this and clear false bans after attacks.
+
+### Backend response time cascade
+Once one backend starts responding slowly (125s during attack), Traefik holds all connections open, consuming goroutines and starving other services. The circuit-breaker (trips at >5s median latency) and `responseHeaderTimeout=15s` prevent this cascade.
 
 ## Kernel Conntrack Tuning
 
@@ -261,8 +271,7 @@ During large DDoS attacks (18K+ req/sec), the Linux conntrack table fills up and
 
 ```bash
 # Current usage vs max
-cat /proc/sys/net/netfilter/nf_conntrack_count
-cat /proc/sys/net/netfilter/nf_conntrack_max
+ssh don@$SERVER_IP "cat /proc/sys/net/netfilter/nf_conntrack_count && echo '/' && cat /proc/sys/net/netfilter/nf_conntrack_max"
 
 # Emergency increase (if sysctl-init hasn't run)
 sudo sysctl -w net.netfilter.nf_conntrack_max=2097152
@@ -294,6 +303,64 @@ Add to the service's Docker labels:
 - "traefik.http.routers.<name>.middlewares=inflight-limit@file,circuit-breaker@file"
 ```
 
+## Container Resource Limits
+
+| Container | Memory | CPU |
+|-----------|--------|-----|
+| traefik | 16GB | 6 cores |
+| crowdsec | no limit | 0.5 cores |
+| coding-global-web | 2GB | no limit |
+
 ## CrowdSec Server IP Whitelist
 
-The server IP is whitelisted in CrowdSec to prevent self-banning from internal API traffic. Whitelist config: `/etc/crowdsec/parsers/s02-enrich/server-whitelist.yaml`
+The server IP and admin VPN IP are whitelisted in CrowdSec to prevent banning from internal traffic and false positives. Whitelist config: `crowdsec/server-whitelist.yaml`, mounted to both parser (`s02-enrich`) and postoverflow (`s01-whitelist`) stages.
+
+## Useful Cloudflare Expression Fields (Free Plan)
+
+| Field | Description |
+|-------|-------------|
+| `http.request.uri.path` | Request path |
+| `http.request.uri.query` | Query string |
+| `http.user_agent` | User agent header |
+| `http.x_forwarded_for` | X-Forwarded-For header |
+| `cf.client.bot` | Known good bot (Google, Bing etc.) |
+| `cf.threat_score` | Cloudflare threat score (0-100, higher = worse) |
+| `ip.src` | Source IP |
+| `ip.src.asnum` | Source ASN number |
+| `ip.src.country` | Source country code |
+| `http.request.method` | HTTP method (GET, POST etc.) |
+| `http.request.version` | HTTP version |
+| `ssl` | Whether request used HTTPS |
+| `http.host` | Hostname (useful for multi-domain skip rules) |
+
+**Not available on free plan:** `matches` (regex), `cf.bot_management.score`, WAF attack score.
+
+## Datacenter ASN List
+
+Hosting/VPN providers commonly used by botnets:
+
+| ASN | Provider |
+|-----|----------|
+| 13238 | Yandex |
+| 14061 | DigitalOcean |
+| 15169 | Google Cloud |
+| 16276 | OVH |
+| 24940 | Hetzner |
+| 32934 | Facebook/Meta |
+| 36352 | ColoCrossing |
+| 45102 | Alibaba |
+| 55286 | Tatar Telecom |
+| 63949 | Linode/Akamai |
+| 197540 | netcup |
+| 39351 | 31173 Services |
+
+## Free Plan Limits
+
+- 5 custom WAF rules (active + inactive count)
+- 1 rate limiting rule
+- No regex (`matches` operator)
+- No `managed_challenge` in rate limiting (block only)
+- Rate limit mitigation timeout fixed at 10 seconds
+- No AI bot protection
+- No WAF attack score
+- DDoS L7 managed rules: full access, customizable
