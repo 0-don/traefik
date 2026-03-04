@@ -5,7 +5,7 @@ services:
     restart: always
     depends_on:
       - crowdsec
-    cpus: 4.0
+    cpus: 8.0
     mem_limit: 16g
     memswap_limit: 16g
     command:
