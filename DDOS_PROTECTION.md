@@ -87,27 +87,28 @@ ssh don@$SERVER_IP "docker exec crowdsec cscli decisions delete --ip <IP>"
 
 ## Current Cloudflare Rules
 
-### coding.global (4/5 custom rules used)
+### coding.global (5/5 custom rules used)
 
 | # | Name | Action | Expression |
 |---|------|--------|------------|
 | 1 | Allow IndexNow | skip | `http.request.uri.path eq "/fa52fd419e4c203cf499dabb0beaa1fe.txt"` |
-| 2 | Block DDoS patterns | block | `(http.request.uri.query contains "cb=") or (http.x_forwarded_for contains ",") or (http.user_agent eq "") or (http.request.method eq "HEAD" and not cf.client.bot)` |
-| 3 | Challenge high threat score | managed_challenge | `(not cf.client.bot and cf.threat_score gt 10)` |
-| 4 | Challenge datacenter traffic | managed_challenge | `(not cf.client.bot and ip.src.asnum in {13238 14061 15169 16276 24940 32934 36352 45102 55286 63949 197540 39351})` |
+| 2 | Skip challenges for static assets | skip | `(http.host eq "ph.coding.global" or /api/* or *.js or *.css or *.webmanifest or *.json or *.ico or *.png or *.jpg or *.svg or *.gif or *.webp or *.woff2)` |
+| 3 | Block DDoS patterns | block | `(http.request.uri.query contains "cb=") or (http.x_forwarded_for contains ",") or (http.request.method eq "HEAD" and not cf.client.bot) or (http.user_agent eq "" and http.host eq "coding.global")` |
+| 4 | Challenge high threat score | managed_challenge | `(not cf.client.bot and cf.threat_score gt 10)` |
+| 5 | Challenge datacenter traffic | managed_challenge | `(not cf.client.bot and ip.src.asnum in {13238 14061 15169 16276 24940 32934 36352 45102 55286 63949 197540 39351})` |
 
 ### unorouter.ai (4/5 custom rules used)
 
 | # | Name | Action | Expression |
 |---|------|--------|------------|
-| 1 | Skip WAF for API gateway | skip | `(http.host eq "api.unorouter.ai")` |
-| 2 | Block DDoS patterns | block | Same as coding.global rule 2 |
-| 3 | Challenge high threat score | managed_challenge | Same as coding.global rule 3 |
-| 4 | Challenge datacenter traffic | managed_challenge | Same as coding.global rule 4 |
+| 1 | Skip WAF for API and sub2api | skip | `(http.host eq "api.unorouter.ai") or (http.host eq "sub2api.unorouter.ai")` |
+| 2 | Block DDoS patterns | block | `(http.request.uri.query contains "cb=") or (http.x_forwarded_for contains ",") or (http.user_agent eq "") or (http.request.method eq "HEAD" and not cf.client.bot)` |
+| 3 | Challenge high threat score | managed_challenge | `(not cf.client.bot and cf.threat_score gt 10)` |
+| 4 | Challenge datacenter traffic | managed_challenge | `(not cf.client.bot and ip.src.asnum in {13238 14061 15169 16276 24940 32934 36352 45102 55286 63949 197540 39351})` |
 
 ### Rate Limiting (1/1 used, both zones)
 
-100 requests per 10 seconds per IP per colo, action: block.
+1000 requests per 10 seconds per IP per colo, action: block.
 
 ### Other Settings (both zones)
 
