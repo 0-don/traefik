@@ -22,8 +22,8 @@ services:
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
       - --entrypoints.websecure.address=:443
-      - --entrypoints.websecure.transport.respondingTimeouts.readTimeout=30s
-      - --entrypoints.websecure.transport.respondingTimeouts.writeTimeout=30s
+      - --entrypoints.websecure.transport.respondingTimeouts.readTimeout=600s
+      - --entrypoints.websecure.transport.respondingTimeouts.writeTimeout=600s
       - --entrypoints.websecure.transport.respondingTimeouts.idleTimeout=60s
       - --entrypoints.websecure.http.tls=true
       - --entrypoints.websecure.http.tls.certResolver=letsencrypt
@@ -36,8 +36,8 @@ services:
       # Access logs for CrowdSec
       - --accesslog=true
       - --accesslog.filepath=/var/log/traefik/access.log
-      # Backend response timeout (kill slow connections instead of holding them)
-      - --serversTransport.forwardingTimeouts.responseHeaderTimeout=15s
+      # Backend response timeout (5 min for LLM non-streaming requests)
+      - --serversTransport.forwardingTimeouts.responseHeaderTimeout=300s
       - --serversTransport.forwardingTimeouts.dialTimeout=5s
       - --serversTransport.forwardingTimeouts.idleConnTimeout=30s
       # CrowdSec bouncer plugin
