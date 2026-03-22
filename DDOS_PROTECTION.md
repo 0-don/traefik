@@ -85,19 +85,31 @@ ssh don@$SERVER_IP "docker exec crowdsec cscli decisions add --ip <IP> --duratio
 ssh don@$SERVER_IP "docker exec crowdsec cscli decisions delete --ip <IP>"
 ```
 
-## Current Cloudflare Rules
+## Current Cloudflare State (defaults, as of March 22, 2026)
 
-### coding.global (5/5 custom rules used)
+All custom rules and overrides are **disabled** (not deleted). Cloudflare is running with default settings. To re-enable during an attack, see "Re-enable DDoS Protection" below.
+
+### Settings (both zones)
+
+- Security level: medium (default)
+- Bot Fight Mode: off
+- Crawler protection: disabled
+- AI Bots protection: disabled
+- DDoS L7 override: disabled (Cloudflare managed defaults)
+- Rate limiting: disabled
+- All WAF custom rules: disabled
+
+### coding.global (5/5 custom rules, all disabled)
 
 | # | Name | Action | Expression |
 |---|------|--------|------------|
 | 1 | Allow IndexNow | skip | `http.request.uri.path eq "/fa52fd419e4c203cf499dabb0beaa1fe.txt"` |
-| 2 | Skip challenges for static assets | skip | `(http.host eq "ph.coding.global" or /api/* or *.js or *.css or *.webmanifest or *.json or *.ico or *.png or *.jpg or *.svg or *.gif or *.webp or *.woff2)` |
+| 2 | Skip challenges for static assets | skip | `(http.host eq "ph.coding.global" or premiumalts hosts or /api/* or *.js *.css *.webmanifest *.json *.ico *.png *.jpg *.svg *.gif *.webp *.woff2)` |
 | 3 | Block DDoS patterns | block | `(http.request.uri.query contains "cb=") or (http.x_forwarded_for contains ",") or (http.request.method eq "HEAD" and not cf.client.bot) or (http.user_agent eq "" and http.host eq "coding.global")` |
 | 4 | Challenge high threat score | managed_challenge | `(not cf.client.bot and cf.threat_score gt 10)` |
 | 5 | Challenge datacenter traffic | managed_challenge | `(not cf.client.bot and ip.src.asnum in {13238 14061 15169 16276 24940 32934 36352 45102 55286 63949 197540 39351})` |
 
-### unorouter.ai (4/5 custom rules used)
+### unorouter.ai (4/5 custom rules, all disabled)
 
 | # | Name | Action | Expression |
 |---|------|--------|------------|
@@ -106,16 +118,96 @@ ssh don@$SERVER_IP "docker exec crowdsec cscli decisions delete --ip <IP>"
 | 3 | Challenge high threat score | managed_challenge | `(not cf.client.bot and cf.threat_score gt 10)` |
 | 4 | Challenge datacenter traffic | managed_challenge | `(not cf.client.bot and ip.src.asnum in {13238 14061 15169 16276 24940 32934 36352 45102 55286 63949 197540 39351})` |
 
-### Rate Limiting (1/1 used, both zones)
+### Rate Limiting (both zones, disabled)
 
-1000 requests per 10 seconds per IP per colo, action: block.
+1000 requests per 10 seconds per IP per colo, action: block. Currently disabled.
 
-### Other Settings (both zones)
+## Re-enable DDoS Protection
 
-- Security level: high
-- Bot Fight Mode: enabled
-- Crawler protection: enabled
-- DDoS L7 override: block at low sensitivity (most aggressive)
+Run these to re-enable everything during an attack. All rules are preserved and just need `enabled: true`.
+
+### Quick: re-enable all WAF rules
+
+```bash
+# coding.global: re-enable all 5 WAF rules
+RULESET_CG="449026f1feff45ac831143114167d8d4"
+curl -s "https://api.cloudflare.com/client/v4/zones/$ZONE_CG/rulesets/$RULESET_CG" \
+  -H "X-Auth-Email: $EMAIL" -H "X-Auth-Key: $KEY" \
+  | jq '.result.rules[] | .enabled = true' \
+  | jq -s '{rules: .}' \
+  | curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/$ZONE_CG/rulesets/$RULESET_CG" \
+    -H "X-Auth-Email: $EMAIL" -H "X-Auth-Key: $KEY" \
+    -H "Content-Type: application/json" -d @-
+
+# unorouter.ai: re-enable all 4 WAF rules
+RULESET_UR="63ea0cf9fe4548a4941c8982a10b0b3a"
+curl -s "https://api.cloudflare.com/client/v4/zones/$ZONE_UR/rulesets/$RULESET_UR" \
+  -H "X-Auth-Email: $EMAIL" -H "X-Auth-Key: $KEY" \
+  | jq '.result.rules[] | .enabled = true' \
+  | jq -s '{rules: .}' \
+  | curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/$ZONE_UR/rulesets/$RULESET_UR" \
+    -H "X-Auth-Email: $EMAIL" -H "X-Auth-Key: $KEY" \
+    -H "Content-Type: application/json" -d @-
+```
+
+### Quick: re-enable rate limiting
+
+```bash
+# coding.global
+RL_CG="67790eef98744933ab5683681dee37b7"
+curl -s "https://api.cloudflare.com/client/v4/zones/$ZONE_CG/rulesets/$RL_CG" \
+  -H "X-Auth-Email: $EMAIL" -H "X-Auth-Key: $KEY" \
+  | jq '.result.rules[] | .enabled = true' \
+  | jq -s '{rules: .}' \
+  | curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/$ZONE_CG/rulesets/$RL_CG" \
+    -H "X-Auth-Email: $EMAIL" -H "X-Auth-Key: $KEY" \
+    -H "Content-Type: application/json" -d @-
+
+# unorouter.ai
+RL_UR="601cfe80b5b64c43b547c5a6f026930b"
+curl -s "https://api.cloudflare.com/client/v4/zones/$ZONE_UR/rulesets/$RL_UR" \
+  -H "X-Auth-Email: $EMAIL" -H "X-Auth-Key: $KEY" \
+  | jq '.result.rules[] | .enabled = true' \
+  | jq -s '{rules: .}' \
+  | curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/$ZONE_UR/rulesets/$RL_UR" \
+    -H "X-Auth-Email: $EMAIL" -H "X-Auth-Key: $KEY" \
+    -H "Content-Type: application/json" -d @-
+```
+
+### Quick: re-enable DDoS L7 override (block at low sensitivity)
+
+```bash
+# coding.global
+DDOS_CG="a8e4b7157659479bbd20abe1bfe1bdb8"
+curl -s "https://api.cloudflare.com/client/v4/zones/$ZONE_CG/rulesets/$DDOS_CG" \
+  -H "X-Auth-Email: $EMAIL" -H "X-Auth-Key: $KEY" \
+  | jq '.result.rules[] | .enabled = true' \
+  | jq -s '{rules: .}' \
+  | curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/$ZONE_CG/rulesets/$DDOS_CG" \
+    -H "X-Auth-Email: $EMAIL" -H "X-Auth-Key: $KEY" \
+    -H "Content-Type: application/json" -d @-
+
+# unorouter.ai
+DDOS_UR="44d37ddbfe47419fbd23a9825110acd8"
+curl -s "https://api.cloudflare.com/client/v4/zones/$ZONE_UR/rulesets/$DDOS_UR" \
+  -H "X-Auth-Email: $EMAIL" -H "X-Auth-Key: $KEY" \
+  | jq '.result.rules[] | .enabled = true' \
+  | jq -s '{rules: .}' \
+  | curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/$ZONE_UR/rulesets/$DDOS_UR" \
+    -H "X-Auth-Email: $EMAIL" -H "X-Auth-Key: $KEY" \
+    -H "Content-Type: application/json" -d @-
+```
+
+### Quick: raise security level to high
+
+```bash
+for ZONE in $ZONE_CG $ZONE_UR; do
+  curl -s -X PATCH "https://api.cloudflare.com/client/v4/zones/$ZONE/settings/security_level" \
+    -H "X-Auth-Email: $EMAIL" -H "X-Auth-Key: $KEY" \
+    -H "Content-Type: application/json" \
+    --data '{"value":"high"}'
+done
+```
 
 ## How to Update Rules During an Attack
 
@@ -175,13 +267,13 @@ curl -s -X PATCH "https://api.cloudflare.com/client/v4/zones/$ZONE_CG/settings/s
   --data '{"value":"under_attack"}'
 ```
 
-Disable when attack stops:
+Disable when attack stops (return to default):
 
 ```bash
 curl -s -X PATCH "https://api.cloudflare.com/client/v4/zones/$ZONE_CG/settings/security_level" \
   -H "X-Auth-Email: $EMAIL" -H "X-Auth-Key: $KEY" \
   -H "Content-Type: application/json" \
-  --data '{"value":"high"}'
+  --data '{"value":"medium"}'
 ```
 
 ## Attack Analysis: March 4, 2026
