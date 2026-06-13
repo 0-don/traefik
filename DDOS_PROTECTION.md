@@ -16,9 +16,13 @@ Cloudflare blocks at the edge. Kernel conntrack tuning prevents connection table
 EMAIL="don.cryptus@gmail.com"
 KEY="<your-global-api-key>"
 SERVER_IP="<your-server-ip>"
-ZONE_CG="b48b416ddd4ab255df880eb756464b20"  # coding.global
+ZONE_CG="b48b416ddd4ab255df880eb756464b20"  # coding.global (legacy, pre-migration)
+ZONE_CGC="f56ce8ac5c1e8e621fe2d420591a78e3" # coding-global.com (active)
 ZONE_UR="09567baf778ae9946a29a034811323c6"  # unorouter.ai
 ```
+
+coding-global.com ruleset IDs (rules mirrored from coding.global, all disabled by default):
+WAF custom `10f0f704c95f49deaaf50e512a144ed8`, rate-limit `4cb689688dc24c5c8153e8cc212ff847`.
 
 ### Check if an attack is happening
 
