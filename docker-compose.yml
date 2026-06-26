@@ -22,8 +22,10 @@ services:
       - --entrypoints.web.http.redirections.entrypoint.to=websecure
       - --entrypoints.web.http.redirections.entrypoint.scheme=https
       - --entrypoints.websecure.address=:443
-      - --entrypoints.websecure.transport.respondingTimeouts.readTimeout=600s
-      - --entrypoints.websecure.transport.respondingTimeouts.writeTimeout=600s
+      # 0 = no wall-clock cap on streamed responses (SSE/long LLM reasoning).
+      # Stuck/silent streams are reaped upstream by new-api STREAMING_TIMEOUT (idle).
+      - --entrypoints.websecure.transport.respondingTimeouts.readTimeout=0
+      - --entrypoints.websecure.transport.respondingTimeouts.writeTimeout=0
       - --entrypoints.websecure.transport.respondingTimeouts.idleTimeout=60s
       - --entrypoints.websecure.http.tls=true
       - --entrypoints.websecure.http.tls.certResolver=letsencrypt
