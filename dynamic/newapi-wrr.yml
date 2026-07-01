@@ -1,39 +1,19 @@
-# WRR router for new-api: fuses the two swarm services (newapi-master +
-# newapi-slave) behind ONE router so Traefik load-balances across both. The
-# router lives HERE, in the file provider, on purpose: if both swarm services
-# declared the same `newapi` router in their deploy.labels they would collide
-# ("service defined multiple times"). Here each swarm service only publishes
-# itself as a plain LB service (port + healthcheck) via deploy.labels, and this
-# weighted service references them by <name>@swarm.
-#
-# WRR across services is file-provider-only in Traefik v3 (the swarm/docker
-# providers cannot express `weighted`). The crowdsec bouncer + TLS are applied at
-# the websecure entrypoint globally, so no per-router middleware needed here.
+# WRR router fusing the two swarm services (newapi-master + newapi-slave) behind
+# one router; the router lives here because two swarm services declaring the same
+# router label would collide, and WRR is file-provider-only in Traefik v3.
 http:
   routers:
-    # Distinct name (newapi-ha) so it never collides with the OLD plain-compose
-    # container's docker-provider `newapi` router during the one-time cutover
-    # (both briefly exist). Higher priority than the default (rule-length) so this
-    # WRR wins for api.unorouter.com the instant it has a healthy swarm backend;
-    # once the stack replaces the old container, the old router disappears and
-    # only this remains.
+    # Distinct name + priority 100 so it wins Host(api.unorouter.com) without
+    # colliding with any leftover docker-provider newapi router during cutover.
     newapi-ha:
       rule: "Host(`api.unorouter.com`)"
       priority: 100
       entryPoints:
         - websecure
       service: newapi-wrr
-      # Zero-downtime during a swarm rolling update. Root cause (traefik#11252):
-      # Traefik's swarm provider reacts to the container `die` event too late, so
-      # for ~1s after a task is killed the WRR still holds its now-dead IP and a
-      # request routed there HANGS on the backend dial until timeout (observed as
-      # a 10s `000`). Fix = two layers:
-      #   1. newapi-fast serversTransport (below) caps the backend dial at 2s, so
-      #      a dead-task dial FAILS FAST instead of hanging.
-      #   2. this retry middleware then re-dispatches the failed request through
-      #      the WRR onto the still-healthy sibling. Fast-fail + retry = the client
-      #      never sees the blip. (Plain retry alone could not help while the dial
-      #      hung for the full timeout.)
+      # Zero-downtime on rolling updates: Traefik reacts to the swarm `die` event
+      # late (traefik#11252), so a request can hit a just-dead task IP. dialTimeout
+      # (below) fails that dial fast and this retry redispatches to the healthy sibling.
       middlewares:
         - newapi-retry
       tls:
@@ -46,9 +26,8 @@ http:
         initialInterval: 100ms
 
   serversTransports:
-    # Short dial timeout so a dead task IP (stale in the WRR for ~1s after a swarm
-    # task dies) fails the connection FAST, letting the retry middleware redispatch
-    # to the healthy sibling instead of hanging on the dead backend until timeout.
+    # Cap the backend dial so a stale dead-task IP fails fast (~2s) instead of
+    # hanging to timeout, letting the retry middleware redispatch.
     newapi-fast:
       forwardingTimeouts:
         dialTimeout: "2s"
@@ -56,16 +35,11 @@ http:
   services:
     newapi-wrr:
       weighted:
-        # equal split; a dead child is dropped by healthCheck propagation below.
         services:
           - name: "newapi-master@swarm"
             weight: 1
           - name: "newapi-slave@swarm"
             weight: 1
-        # Propagate child health up the WRR: when a child LB reports all its
-        # servers down, this weighted service stops routing to it. The child
-        # services set the actual probe interval via deploy.labels
-        # (loadbalancer.healthcheck.interval=5s); this block just enables the
-        # parent-level propagation. The retry middleware covers the sub-interval
-        # swap window where a child is dead but not yet marked down.
+        # Propagate child health up the WRR so a fully-down child is dropped from
+        # rotation; child probe intervals are set via their deploy.labels.
         healthCheck: {}
