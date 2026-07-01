@@ -1,0 +1,42 @@
+# WRR router for new-api: fuses the two swarm services (newapi-master +
+# newapi-slave) behind ONE router so Traefik load-balances across both. The
+# router lives HERE, in the file provider, on purpose: if both swarm services
+# declared the same `newapi` router in their deploy.labels they would collide
+# ("service defined multiple times"). Here each swarm service only publishes
+# itself as a plain LB service (port + healthcheck) via deploy.labels, and this
+# weighted service references them by <name>@swarm.
+#
+# WRR across services is file-provider-only in Traefik v3 (the swarm/docker
+# providers cannot express `weighted`). The crowdsec bouncer + TLS are applied at
+# the websecure entrypoint globally, so no per-router middleware needed here.
+http:
+  routers:
+    # Distinct name (newapi-ha) so it never collides with the OLD plain-compose
+    # container's docker-provider `newapi` router during the one-time cutover
+    # (both briefly exist). Higher priority than the default (rule-length) so this
+    # WRR wins for api.unorouter.com the instant it has a healthy swarm backend;
+    # once the stack replaces the old container, the old router disappears and
+    # only this remains.
+    newapi-ha:
+      rule: "Host(`api.unorouter.com`)"
+      priority: 100
+      entryPoints:
+        - websecure
+      service: newapi-wrr
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    newapi-wrr:
+      weighted:
+        # equal split; a dead child is dropped by healthCheck propagation below.
+        services:
+          - name: "newapi-master@swarm"
+            weight: 1
+          - name: "newapi-slave@swarm"
+            weight: 1
+        # Propagate child health up the WRR: when a child LB reports all its
+        # servers down, this weighted service stops routing to it. Requires the
+        # child services to have healthcheck configured (they do, via
+        # deploy.labels loadbalancer.healthcheck.path=/api/status).
+        healthCheck: {}

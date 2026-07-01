@@ -10,6 +10,14 @@ services:
     memswap_limit: 16g
     command:
       - --providers.docker=true
+      # Swarm provider alongside docker: the new-api master/slave run as a swarm
+      # stack (native replicas + start-first rolling); the other services stay
+      # plain-compose on the docker provider. v3 splits the two providers so one
+      # Traefik serves both at once. Swarm gives no port autodetection, so those
+      # services MUST set loadbalancer.server.port in their deploy.labels.
+      - --providers.swarm=true
+      - --providers.swarm.endpoint=unix:///var/run/docker.sock
+      - --providers.swarm.network=newapi-overlay
       - --providers.file.directory=/etc/traefik/dynamic
       - --api.dashboard=true
       # LetsEncrypt
@@ -53,6 +61,9 @@ services:
       - "127.0.0.1:443:443"
     networks:
       - proxy
+      # Overlay shared with the new-api swarm stack. A bridge-only Traefik cannot
+      # reach swarm task IPs, so it must join their --attachable overlay directly.
+      - newapi-overlay
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ~/traefik:/letsencrypt
@@ -141,3 +152,7 @@ networks:
   proxy:
     external: false
     name: proxy
+  # Created out-of-band in CI: docker network create --driver overlay
+  # --attachable newapi-overlay. External so `compose up` never recreates it.
+  newapi-overlay:
+    external: true
