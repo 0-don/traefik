@@ -23,8 +23,35 @@ http:
       entryPoints:
         - websecure
       service: newapi-wrr
+      # Zero-downtime during a swarm rolling update. Root cause (traefik#11252):
+      # Traefik's swarm provider reacts to the container `die` event too late, so
+      # for ~1s after a task is killed the WRR still holds its now-dead IP and a
+      # request routed there HANGS on the backend dial until timeout (observed as
+      # a 10s `000`). Fix = two layers:
+      #   1. newapi-fast serversTransport (below) caps the backend dial at 2s, so
+      #      a dead-task dial FAILS FAST instead of hanging.
+      #   2. this retry middleware then re-dispatches the failed request through
+      #      the WRR onto the still-healthy sibling. Fast-fail + retry = the client
+      #      never sees the blip. (Plain retry alone could not help while the dial
+      #      hung for the full timeout.)
+      middlewares:
+        - newapi-retry
       tls:
         certResolver: letsencrypt
+
+  middlewares:
+    newapi-retry:
+      retry:
+        attempts: 4
+        initialInterval: 100ms
+
+  serversTransports:
+    # Short dial timeout so a dead task IP (stale in the WRR for ~1s after a swarm
+    # task dies) fails the connection FAST, letting the retry middleware redispatch
+    # to the healthy sibling instead of hanging on the dead backend until timeout.
+    newapi-fast:
+      forwardingTimeouts:
+        dialTimeout: "2s"
 
   services:
     newapi-wrr:
@@ -36,7 +63,9 @@ http:
           - name: "newapi-slave@swarm"
             weight: 1
         # Propagate child health up the WRR: when a child LB reports all its
-        # servers down, this weighted service stops routing to it. Requires the
-        # child services to have healthcheck configured (they do, via
-        # deploy.labels loadbalancer.healthcheck.path=/api/status).
+        # servers down, this weighted service stops routing to it. The child
+        # services set the actual probe interval via deploy.labels
+        # (loadbalancer.healthcheck.interval=5s); this block just enables the
+        # parent-level propagation. The retry middleware covers the sub-interval
+        # swap window where a child is dead but not yet marked down.
         healthCheck: {}
