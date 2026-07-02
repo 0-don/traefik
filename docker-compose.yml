@@ -120,6 +120,10 @@ services:
     environment:
       COLLECTIONS: "crowdsecurity/traefik crowdsecurity/http-cve crowdsecurity/http-dos"
       BOUNCER_KEY_traefik: "052ee0b1e0cf335d096ef25f5586491ec7bf217cddd7dc6e26ec215813e74f53"
+      # Drop the CAPI community blocklist: it false-positive-bans VPN/datacenter
+      # shared IPs (~23k bans, 99.9% of all), 403ing legit users on a public API.
+      # Local scenarios still ban real attackers hitting THIS box.
+      DISABLE_ONLINE_API: "true"
     volumes:
       - ./crowdsec/acquis.yaml:/etc/crowdsec/acquis.yaml
       - ./crowdsec/server-whitelist.yaml:/etc/crowdsec/parsers/s02-enrich/server-whitelist.yaml
