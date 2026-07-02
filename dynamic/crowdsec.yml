@@ -9,6 +9,14 @@ http:
           crowdsecLapiHost: crowdsec:8080
           crowdsecLapiKey: "052ee0b1e0cf335d096ef25f5586491ec7bf217cddd7dc6e26ec215813e74f53"
           updateIntervalSeconds: 15
+          # Real client IPs that skip the CrowdSec check entirely (never queried
+          # against LAPI, so CAPI community blocklists can't 403 them either).
+          # Parser/postoverflow whitelists only stop LOCAL scenarios; CAPI bans
+          # are enforced at the bouncer, so trusted clients must be listed HERE.
+          clientTrustedIPs:
+            - 136.243.0.0/16   # firm NAT pool (Hetzner) - rotating egress IPs
+            - 88.130.0.0/16    # dev/sync box IPv4 (1&1 Versatel rotation)
+            - 2001:9e8::/32    # dev/sync box IPv6 (1&1 Versatel /32 alloc)
           forwardedHeadersTrustedIPs:
             - 172.16.0.0/12
             - 10.0.0.0/8
