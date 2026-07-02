@@ -44,4 +44,4 @@ jobs:
         run: docker network create --driver overlay --attachable newapi-overlay 2>/dev/null || true
 
       - name: Docker run
-        run: docker compose up -d --force-recreate --build
+        run: docker compose up -d --force-recreate --build --remove-orphans

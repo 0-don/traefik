@@ -3,8 +3,6 @@ services:
     image: traefik:latest
     container_name: traefik
     restart: always
-    depends_on:
-      - crowdsec
     cpus: 6.0
     mem_limit: 16g
     memswap_limit: 16g
@@ -41,8 +39,8 @@ services:
       # Without it every request logs cloudflared's IP (172.18.0.x), so CrowdSec
       # sees one shared IP and a single DoS trip 403s ALL users behind the tunnel.
       - --entrypoints.websecure.forwardedHeaders.trustedIPs=172.18.0.0/16,173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22
-      # CrowdSec bouncer on all HTTPS requests
-      - --entrypoints.websecure.http.middlewares=crowdsec@file
+      # CrowdSec disabled (see crowdsec service block below)
+      # - --entrypoints.websecure.http.middlewares=crowdsec@file
       # Access logs for CrowdSec
       - --accesslog=true
       - --accesslog.filepath=/var/log/traefik/access.log
@@ -50,9 +48,9 @@ services:
       - --serversTransport.forwardingTimeouts.responseHeaderTimeout=300s
       - --serversTransport.forwardingTimeouts.dialTimeout=5s
       - --serversTransport.forwardingTimeouts.idleConnTimeout=30s
-      # CrowdSec bouncer plugin
-      - --experimental.plugins.crowdsec-bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
-      - --experimental.plugins.crowdsec-bouncer.version=v1.5.0
+      # CrowdSec bouncer plugin (disabled)
+      # - --experimental.plugins.crowdsec-bouncer.modulename=github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin
+      # - --experimental.plugins.crowdsec-bouncer.version=v1.5.0
     environment:
       - CLOUDFLARE_EMAIL=$CLOUDFLARE_EMAIL
       - CLOUDFLARE_DNS_API_TOKEN=$CLOUDFLARE_DNS_API_TOKEN
@@ -110,29 +108,30 @@ services:
         sysctl -w net.netfilter.nf_conntrack_tcp_timeout_established=300
         sysctl -w net.netfilter.nf_conntrack_tcp_timeout_close_wait=10
 
-  crowdsec:
-    image: crowdsecurity/crowdsec:latest
-    container_name: crowdsec
-    restart: always
-    cpus: 0.5
-    labels:
-      - traefik.enable=false
-    environment:
-      COLLECTIONS: "crowdsecurity/traefik crowdsecurity/http-cve crowdsecurity/http-dos"
-      BOUNCER_KEY_traefik: "052ee0b1e0cf335d096ef25f5586491ec7bf217cddd7dc6e26ec215813e74f53"
-      # Drop the CAPI community blocklist: it false-positive-bans VPN/datacenter
-      # shared IPs (~23k bans, 99.9% of all), 403ing legit users on a public API.
-      # Local scenarios still ban real attackers hitting THIS box.
-      DISABLE_ONLINE_API: "true"
-    volumes:
-      - ./crowdsec/acquis.yaml:/etc/crowdsec/acquis.yaml
-      - ./crowdsec/server-whitelist.yaml:/etc/crowdsec/parsers/s02-enrich/server-whitelist.yaml
-      - ./crowdsec/server-whitelist.yaml:/etc/crowdsec/postoverflows/s01-whitelist/server-whitelist.yaml
-      - crowdsec-db:/var/lib/crowdsec/data/
-      - crowdsec-config:/etc/crowdsec/
-      - traefik-logs:/var/log/traefik:ro
-    networks:
-      - proxy
+  # CrowdSec disabled: kept banning legit users (VPN/datacenter shared IPs)
+  # despite CAPI off + whitelists. Re-enable by uncommenting this block, the
+  # bouncer plugin + middleware lines above, and renaming
+  # dynamic/crowdsec.yml.disabled back to crowdsec.yml.
+  # crowdsec:
+  #   image: crowdsecurity/crowdsec:latest
+  #   container_name: crowdsec
+  #   restart: always
+  #   cpus: 0.5
+  #   labels:
+  #     - traefik.enable=false
+  #   environment:
+  #     COLLECTIONS: "crowdsecurity/traefik crowdsecurity/http-cve crowdsecurity/http-dos"
+  #     BOUNCER_KEY_traefik: "052ee0b1e0cf335d096ef25f5586491ec7bf217cddd7dc6e26ec215813e74f53"
+  #     DISABLE_ONLINE_API: "true"
+  #   volumes:
+  #     - ./crowdsec/acquis.yaml:/etc/crowdsec/acquis.yaml
+  #     - ./crowdsec/server-whitelist.yaml:/etc/crowdsec/parsers/s02-enrich/server-whitelist.yaml
+  #     - ./crowdsec/server-whitelist.yaml:/etc/crowdsec/postoverflows/s01-whitelist/server-whitelist.yaml
+  #     - crowdsec-db:/var/lib/crowdsec/data/
+  #     - crowdsec-config:/etc/crowdsec/
+  #     - traefik-logs:/var/log/traefik:ro
+  #   networks:
+  #     - proxy
 
   cloudflared:
     image: cloudflare/cloudflared:latest
