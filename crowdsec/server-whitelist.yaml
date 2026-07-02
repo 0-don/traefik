@@ -5,6 +5,7 @@ whitelist:
   ip:
     - ${SERVER_IP}
     - 185.209.196.213
+    - 203.161.57.126 # customer alsryhymmr@gmail.com prod server (paid, verified)
   cidr:
     - 88.130.0.0/16 # dev/sync box IPv4 (1&1 Versatel rotates within this range)
     - 2001:9e8::/32 # dev/sync box IPv6 (1&1 Versatel /32 alloc; ISP rotates the whole /64 so pin the ISP block)
