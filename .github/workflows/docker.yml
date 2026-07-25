@@ -24,24 +24,6 @@ jobs:
           echo TRAEFIK_USER_PASS=${{ secrets.TRAEFIK_USER_PASS }} >> .env
           echo TRAEFIK_PILOT_TOKEN=${{ secrets.TRAEFIK_PILOT_TOKEN }} >> .env
           echo SERVER_IP=$(curl -s https://ipinfo.io/ip) >> .env
-          cat .env
-
-      - name: Generate CrowdSec whitelist
-        run: |
-          SERVER_IP=$(curl -s https://ipinfo.io/ip)
-          sed -i "s/\${SERVER_IP}/$SERVER_IP/" crowdsec/server-whitelist.yaml
-
-      # Traefik now serves the new-api swarm stack via --providers.swarm and joins
-      # the newapi-overlay to reach its task IPs. Both require swarm active + the
-      # overlay to exist, and the compose file declares the overlay external - so
-      # ensure them here (idempotent) or the `compose up` below fails to start.
-      # grep -qx (exact whole-line): a plain `grep active` also matches the
-      # substring in "inactive", so it would skip init on a fresh host.
-      - name: Ensure swarm active
-        run: docker info --format '{{.Swarm.LocalNodeState}}' | grep -qx active || docker swarm init
-
-      - name: Ensure overlay network
-        run: docker network create --driver overlay --attachable newapi-overlay 2>/dev/null || true
 
       - name: Docker run
         run: docker compose up -d --force-recreate --build --remove-orphans
