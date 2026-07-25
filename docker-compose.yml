@@ -119,6 +119,8 @@ services:
       # Required for the init admin user; without it Core boots with no way to log in.
       KOMODO_LOCAL_AUTH: "true"
       KOMODO_DISABLE_USER_REGISTRATION: "true"
+      # Drives auto_update on stacks. Default is 1-hr, too slow to notice a push.
+      KOMODO_RESOURCE_POLL_INTERVAL: 5-min
       KOMODO_PERIPHERY_PUBLIC_KEY: file:/config/keys/periphery.pub
     volumes:
       - komodo-keys:/config/keys
