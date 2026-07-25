@@ -116,6 +116,8 @@ services:
       KOMODO_JWT_SECRET: ${KOMODO_JWT_SECRET}
       KOMODO_INIT_ADMIN_USERNAME: ${KOMODO_INIT_ADMIN_USERNAME}
       KOMODO_INIT_ADMIN_PASSWORD: ${KOMODO_INIT_ADMIN_PASSWORD}
+      # Required for the init admin user; without it Core boots with no way to log in.
+      KOMODO_LOCAL_AUTH: "true"
       KOMODO_DISABLE_USER_REGISTRATION: "true"
       KOMODO_PERIPHERY_PUBLIC_KEY: file:/config/keys/periphery.pub
     volumes:
