@@ -61,23 +61,102 @@ services:
       - traefik.http.routers.traefik.middlewares=traefik-auth
       - traefik.http.middlewares.traefik-auth.basicauth.users=admin:$$2y$$05$$QgoabVnNBN3gR4wezwQovOm0glw00bQvUPORrYxz7.rI/rnw07cBG
 
-  # Pulls new GHCR images and restarts the containers labelled
-  # com.centurylinklabs.watchtower.enable=true. Replaces the per-repo self-hosted
-  # runners: images are built on GitHub-hosted runners, this only deploys them.
-  # containrrr/watchtower was archived 2025-12-17; nickfedor is the maintained fork.
-  watchtower:
-    image: nickfedor/watchtower:latest
-    container_name: watchtower
+  # Komodo replaces the per-repo self-hosted runners (29 of them cost 3.0GB RAM
+  # and 71G disk on the old box). Core holds the env vars and redeploys stacks
+  # from git; Periphery is the agent that drives this host's docker.
+  # Secrets live in Core, not in the repo and not baked into images.
+  komodo-db:
+    image: ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.6.0
+    container_name: komodo-db
     restart: always
     labels:
       - traefik.enable=false
+      - komodo.skip= # never stopped by StopAllContainers
     environment:
-      WATCHTOWER_CLEANUP: "true"
-      WATCHTOWER_LABEL_ENABLE: "true"
-      WATCHTOWER_POLL_INTERVAL: 300
+      POSTGRES_USER: ${KOMODO_DATABASE_USERNAME}
+      POSTGRES_PASSWORD: ${KOMODO_DATABASE_PASSWORD}
+      POSTGRES_DB: postgres
     volumes:
+      - komodo-postgres:/var/lib/postgresql/data
+    networks:
+      - proxy
+
+  komodo-ferretdb:
+    image: ghcr.io/ferretdb/ferretdb:2.6.0
+    container_name: komodo-ferretdb
+    restart: always
+    depends_on:
+      - komodo-db
+    labels:
+      - traefik.enable=false
+      - komodo.skip=
+    environment:
+      FERRETDB_POSTGRESQL_URL: postgres://${KOMODO_DATABASE_USERNAME}:${KOMODO_DATABASE_PASSWORD}@komodo-db:5432/postgres
+    volumes:
+      - komodo-ferretdb:/state
+    networks:
+      - proxy
+
+  komodo:
+    image: ghcr.io/moghtech/komodo-core:2
+    container_name: komodo
+    init: true
+    restart: always
+    depends_on:
+      - komodo-ferretdb
+    env_file:
+      - .env
+    environment:
+      KOMODO_DATABASE_ADDRESS: komodo-ferretdb:27017
+      KOMODO_DATABASE_USERNAME: ${KOMODO_DATABASE_USERNAME}
+      KOMODO_DATABASE_PASSWORD: ${KOMODO_DATABASE_PASSWORD}
+      KOMODO_HOST: https://${KOMODO_HOST}
+      KOMODO_PASSKEY: ${KOMODO_PASSKEY}
+      KOMODO_WEBHOOK_SECRET: ${KOMODO_WEBHOOK_SECRET}
+      KOMODO_JWT_SECRET: ${KOMODO_JWT_SECRET}
+      KOMODO_INIT_ADMIN_USERNAME: ${KOMODO_INIT_ADMIN_USERNAME}
+      KOMODO_INIT_ADMIN_PASSWORD: ${KOMODO_INIT_ADMIN_PASSWORD}
+      KOMODO_DISABLE_USER_REGISTRATION: "true"
+      KOMODO_PERIPHERY_PUBLIC_KEY: file:/config/keys/periphery.pub
+    volumes:
+      - komodo-keys:/config/keys
+      - /etc/komodo/backups:/backups
+    networks:
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.komodo.rule=Host(`${KOMODO_HOST}`)
+      - traefik.http.routers.komodo.entrypoints=websecure
+      - traefik.http.routers.komodo.tls.certresolver=letsencrypt
+      - traefik.http.services.komodo.loadbalancer.server.port=9120
+
+  # No ports published: Core reaches it over the compose network, so the agent
+  # is not exposed to the internet (the default periphery setup is open).
+  komodo-periphery:
+    image: ghcr.io/moghtech/komodo-periphery:2
+    container_name: komodo-periphery
+    init: true
+    restart: always
+    depends_on:
+      - komodo
+    env_file:
+      - .env
+    environment:
+      PERIPHERY_PASSKEYS: ${KOMODO_PASSKEY}
+      PERIPHERY_ROOT_DIRECTORY: /etc/komodo
+    labels:
+      - traefik.enable=false
+      - komodo.skip=
+    volumes:
+      - komodo-keys:/config/keys
       - /var/run/docker.sock:/var/run/docker.sock
-      - ~/.docker/config.json:/config.json:ro
+      - /proc:/proc
+      # Path must match inside and outside the container or docker resolves the
+      # stack directories against the wrong root (komodo#180).
+      - /etc/komodo:/etc/komodo
+    networks:
+      - proxy
 
   autoheal:
     image: willfarrell/autoheal
@@ -126,6 +205,9 @@ services:
 
 volumes:
   traefik-logs:
+  komodo-postgres:
+  komodo-ferretdb:
+  komodo-keys:
 
 networks:
   proxy:

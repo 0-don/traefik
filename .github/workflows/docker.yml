@@ -25,5 +25,14 @@ jobs:
           echo TRAEFIK_PILOT_TOKEN=${{ secrets.TRAEFIK_PILOT_TOKEN }} >> .env
           echo SERVER_IP=$(curl -s https://ipinfo.io/ip) >> .env
 
+          echo KOMODO_HOST=${{ secrets.KOMODO_HOST }} >> .env
+          echo KOMODO_DATABASE_USERNAME=${{ secrets.KOMODO_DATABASE_USERNAME }} >> .env
+          echo KOMODO_DATABASE_PASSWORD=${{ secrets.KOMODO_DATABASE_PASSWORD }} >> .env
+          echo KOMODO_PASSKEY=${{ secrets.KOMODO_PASSKEY }} >> .env
+          echo KOMODO_WEBHOOK_SECRET=${{ secrets.KOMODO_WEBHOOK_SECRET }} >> .env
+          echo KOMODO_JWT_SECRET=${{ secrets.KOMODO_JWT_SECRET }} >> .env
+          echo KOMODO_INIT_ADMIN_USERNAME=${{ secrets.KOMODO_INIT_ADMIN_USERNAME }} >> .env
+          echo KOMODO_INIT_ADMIN_PASSWORD=${{ secrets.KOMODO_INIT_ADMIN_PASSWORD }} >> .env
+
       - name: Docker run
         run: docker compose up -d --force-recreate --build --remove-orphans
