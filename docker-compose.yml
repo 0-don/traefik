@@ -66,7 +66,7 @@ services:
   # from git; Periphery is the agent that drives this host's docker.
   # Secrets live in Core, not in the repo and not baked into images.
   komodo-db:
-    image: ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.6.0
+    image: ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0
     container_name: komodo-db
     restart: always
     labels:
@@ -82,7 +82,7 @@ services:
       - proxy
 
   komodo-ferretdb:
-    image: ghcr.io/ferretdb/ferretdb:2.6.0
+    image: ghcr.io/ferretdb/ferretdb:2.7.0
     container_name: komodo-ferretdb
     restart: always
     depends_on:
