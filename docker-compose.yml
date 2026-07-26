@@ -81,6 +81,38 @@ services:
     networks:
       - proxy
 
+  # Komodo Core holds every stack's env vars, so losing this database loses every
+  # secret on the box. Dumps into the duplicati source tree so they ship off-box.
+  komodo-pgbackup:
+    container_name: komodo-pgbackup
+    image: prodrigestivill/postgres-backup-local:17-alpine
+    restart: always
+    networks:
+      - proxy
+    volumes:
+      - ~/duplicati-volume/source/komodo-db-pgbackup:/backups
+      # Core/Periphery keypair lives outside the DB; a restored Core cannot talk
+      # to its agent without it, so ship it alongside the dumps.
+      - komodo-keys:/backups/keys:ro
+    depends_on:
+      - komodo-db
+    labels:
+      - traefik.enable=false
+      - komodo.skip=
+    environment:
+      - POSTGRES_HOST=komodo-db
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=postgres
+      - POSTGRES_USER=${KOMODO_DATABASE_USERNAME}
+      - POSTGRES_PASSWORD=${KOMODO_DATABASE_PASSWORD}
+      - POSTGRES_EXTRA_OPTS=-Fc
+      - SCHEDULE=@every 6h
+      - BACKUP_ON_START=TRUE
+      - BACKUP_KEEP_DAYS=7
+      - BACKUP_KEEP_WEEKS=4
+      - BACKUP_KEEP_MONTHS=0
+      - HEALTHCHECK_PORT=8080
+
   komodo-ferretdb:
     image: ghcr.io/ferretdb/ferretdb:2.7.0
     container_name: komodo-ferretdb
